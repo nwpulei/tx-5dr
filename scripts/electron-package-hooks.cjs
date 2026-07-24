@@ -174,16 +174,20 @@ function cleanNativeSources(nm) {
 
 /**
  * Upstream onnxruntime-node >= 1.24 omitted macOS Intel (darwin/x64) prebuilds.
- * Fail packaging early instead of shipping an app that dies at native-module check.
+ * That target is intentionally allowed to package without a binding (DeepCW
+ * degrades at runtime). Other platform/arch combinations must still ship one.
  */
 function assertOnnxRuntimeBindingPresent(nm, platform, arch) {
   const binding = path.join(nm, 'onnxruntime-node', 'bin', 'napi-v6', platform, arch, 'onnxruntime_binding.node');
   if (fs.existsSync(binding)) return;
-  throw new Error(
-    `onnxruntime-node is missing ${platform}/${arch} binding at ${binding}. `
-    + 'Upstream stopped shipping macOS Intel prebuilds after 1.23.2; keep onnxruntime-node pinned to 1.23.2 '
-    + '(or a later release that restores darwin/x64) before packaging this target.',
-  );
+  if (platform === 'darwin' && arch === 'x64') {
+    console.warn(
+      `onnxruntime-node has no darwin/x64 binding (upstream omission since 1.24). `
+      + 'Packaging continues; DeepCW will be unavailable on Intel Macs.',
+    );
+    return;
+  }
+  throw new Error(`onnxruntime-node is missing ${platform}/${arch} binding at ${binding}.`);
 }
 
 function cleanPackages(appRoot) {

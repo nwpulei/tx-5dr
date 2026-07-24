@@ -34,8 +34,9 @@ export const DEGRADABLE_NATIVE_MODULES = new Set(['node-datachannel']);
 
 /**
  * Upstream onnxruntime-node stopped shipping macOS Intel (darwin/x64) prebuilds
- * after 1.23.2. Keep that specific missing-binding failure degradable so startup
- * is not blocked on Intel Macs when the binding is absent.
+ * after 1.23.x. Keep that specific missing-binding failure degradable so startup
+ * is not blocked on Intel Macs when the binding is absent. DeepCW is unavailable
+ * there; we do not downgrade onnxruntime-node to restore it.
  */
 export function isMissingDarwinX64OnnxBindingError(message: string): boolean {
   return /darwin[/\\]x64[/\\]onnxruntime_binding\.node/.test(message);

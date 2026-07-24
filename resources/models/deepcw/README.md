@@ -30,14 +30,16 @@ You can override the bundled model path with `TX5DR_DEEPCW_MODEL_PATH`.
 ## Runtime acceleration
 
 TX-5DR uses `onnxruntime-node` for DeepCW inference. CPU is always available.
-macOS can use CoreML, and Linux x64 can expose CUDA or experimental WebGPU
-execution providers when the host GPU stack is already installed.
+macOS Apple Silicon can use CoreML, and Linux x64 can expose CUDA or experimental
+WebGPU execution providers when the host GPU stack is already installed.
 
 > **macOS Intel note:** Upstream `onnxruntime-node` stopped shipping
-> `darwin/x64` prebuilds after 1.23.2 (see
+> `darwin/x64` prebuilds after 1.23.x (see
 > [microsoft/onnxruntime#27961](https://github.com/microsoft/onnxruntime/issues/27961)).
-> TX-5DR pins `onnxruntime-node` to `1.23.2` so Intel Mac packages keep a working
-> binding. Do not bump past 1.23.x until a release restores `bin/napi-v6/darwin/x64`.
+> TX-5DR keeps a current `onnxruntime-node` release and does not downgrade just
+> for Intel Macs. On those hosts DeepCW/`onnxruntime-node` is unavailable; native
+> module preflight treats the missing `darwin/x64` binding as degradable so the
+> rest of the app can still start.
 
 Linux GPU acceleration is intentionally self-managed: TX-5DR packages do not
 install NVIDIA drivers, CUDA, cuDNN, or other system GPU libraries. For CUDA,
