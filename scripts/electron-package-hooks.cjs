@@ -172,6 +172,20 @@ function cleanNativeSources(nm) {
   findAndRemoveDirs(nm, '.npm');
 }
 
+/**
+ * Upstream onnxruntime-node >= 1.24 omitted macOS Intel (darwin/x64) prebuilds.
+ * Fail packaging early instead of shipping an app that dies at native-module check.
+ */
+function assertOnnxRuntimeBindingPresent(nm, platform, arch) {
+  const binding = path.join(nm, 'onnxruntime-node', 'bin', 'napi-v6', platform, arch, 'onnxruntime_binding.node');
+  if (fs.existsSync(binding)) return;
+  throw new Error(
+    `onnxruntime-node is missing ${platform}/${arch} binding at ${binding}. `
+    + 'Upstream stopped shipping macOS Intel prebuilds after 1.23.2; keep onnxruntime-node pinned to 1.23.2 '
+    + '(or a later release that restores darwin/x64) before packaging this target.',
+  );
+}
+
 function cleanPackages(appRoot) {
   console.log('Cleaning workspace package sources...');
   findAndRemoveDirs(path.join(appRoot, 'packages'), 'node_modules');
@@ -223,6 +237,7 @@ function cleanPlatformPrebuilds(nm, platform, arch) {
     if (fs.existsSync(linuxOnnx)) {
       for (const entry of fs.readdirSync(linuxOnnx)) if (entry !== onnxKeepArch) rmrf(path.join(linuxOnnx, entry));
     }
+    assertOnnxRuntimeBindingPresent(nm, 'linux', onnxKeepArch);
   }
 
   if (platform === 'darwin') {
@@ -243,6 +258,7 @@ function cleanPlatformPrebuilds(nm, platform, arch) {
     if (fs.existsSync(darwinOnnx)) {
       for (const entry of fs.readdirSync(darwinOnnx)) if (entry !== onnxKeepArch) rmrf(path.join(darwinOnnx, entry));
     }
+    assertOnnxRuntimeBindingPresent(nm, 'darwin', onnxKeepArch);
   }
 
   if (platform === 'win32') {
@@ -260,6 +276,7 @@ function cleanPlatformPrebuilds(nm, platform, arch) {
     if (fs.existsSync(winOnnx)) {
       for (const entry of fs.readdirSync(winOnnx)) if (entry !== onnxKeepArch) rmrf(path.join(winOnnx, entry));
     }
+    assertOnnxRuntimeBindingPresent(nm, 'win32', onnxKeepArch);
   }
 }
 

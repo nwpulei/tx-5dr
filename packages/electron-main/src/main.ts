@@ -3206,10 +3206,11 @@ async function createWindow() {
     if (!nativeCheck.success) {
       const okModules = nativeCheck.modules.filter(m => m.ok).map(m => m.name);
       const failedModules = nativeCheck.modules.filter(m => !m.ok);
-      const degradedRealtimeOnly = isDegradableNativeModuleCheckFailure(nativeCheck);
+      const degradedOnly = isDegradableNativeModuleCheckFailure(nativeCheck);
 
-      if (degradedRealtimeOnly) {
-        logger.warn('degradable realtime native check failed; continuing with PCM/ws fallback available', nativeCheck);
+      if (degradedOnly) {
+        const degradedNames = failedModules.map((moduleResult) => moduleResult.name).join(', ');
+        logger.warn(`degradable native module check failed (${degradedNames}); continuing startup`, nativeCheck);
       } else {
         let detail: string;
         if (nativeCheck.crashedModule) {

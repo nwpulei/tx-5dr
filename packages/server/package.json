@@ -48,7 +48,7 @@
     "node-datachannel": "0.32.3",
     "node-forge": "^1.4.0",
     "node-wav": "^0.0.2",
-    "onnxruntime-node": "^1.26.0",
+    "onnxruntime-node": "1.23.2",
     "rubato-fft-node": "^0.1.0",
     "serialport": "^13.0.0",
     "tci-client-node": "^0.1.2",

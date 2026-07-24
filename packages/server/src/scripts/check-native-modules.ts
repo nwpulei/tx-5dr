@@ -34,6 +34,25 @@ export const DEGRADABLE_NATIVE_MODULES = new Set([
   'node-datachannel',
 ]);
 
+/**
+ * Upstream onnxruntime-node stopped shipping macOS Intel (darwin/x64) prebuilds
+ * after 1.23.2. Treat that specific missing-binding failure as degradable so the
+ * rest of the app can still start; DeepCW simply reports unavailable.
+ * Other onnxruntime load failures (e.g. Windows VC runtime) remain blocking.
+ */
+export function isMissingDarwinX64OnnxBindingError(message: string): boolean {
+  return /darwin[/\\]x64[/\\]onnxruntime_binding\.node/.test(message);
+}
+
+export function isDegradableNativeModuleFailure(moduleName: string, errorMessage?: string): boolean {
+  if (DEGRADABLE_NATIVE_MODULES.has(moduleName)) {
+    return true;
+  }
+  return moduleName === 'onnxruntime-node'
+    && typeof errorMessage === 'string'
+    && isMissingDarwinX64OnnxBindingError(errorMessage);
+}
+
 export type NativeModuleImporter = (moduleName: string) => Promise<unknown>;
 export type NativeModuleLineWriter = (line: string) => void;
 
@@ -56,10 +75,10 @@ export async function runNativeModulePreflight({
       await importer(mod);
       writeLine(`OK:${mod}`);
     } catch (err: unknown) {
-      if (!DEGRADABLE_NATIVE_MODULES.has(mod)) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!isDegradableNativeModuleFailure(mod, msg)) {
         blockingFailure = true;
       }
-      const msg = err instanceof Error ? err.message : String(err);
       // Keep message on a single line so the parent parser stays simple
       writeLine(`FAIL:${mod}:${msg.replace(/\n/g, ' ')}`);
     }
