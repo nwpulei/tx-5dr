@@ -36,6 +36,8 @@ export const AudioDeviceResolutionSetSchema = z.object({
 
 export const AudioOutputSampleFormatSchema = z.enum(['float32', 'int16']);
 export const AudioOutputChannelModeSchema = z.enum(['mono', 'left', 'right', 'both']);
+/** Stereo USB codecs often put radio AF on one channel; mix matches JTDX Mono. */
+export const AudioInputChannelModeSchema = z.enum(['left', 'right', 'mix']);
 
 // 音频设备列表响应
 export const AudioDevicesResponseSchema = z.object({
@@ -55,6 +57,7 @@ export const AudioDeviceSettingsSchema = z.object({
   outputBufferSize: z.number().optional(),
   outputSampleFormat: AudioOutputSampleFormatSchema.optional(),
   outputChannelMode: AudioOutputChannelModeSchema.optional(),
+  inputChannelMode: AudioInputChannelModeSchema.optional(),
   sampleRate: z.number().optional(),
   bufferSize: z.number().optional(),
 });
@@ -115,6 +118,7 @@ export type AudioDeviceResolution = z.infer<typeof AudioDeviceResolutionSchema>;
 export type AudioDeviceResolutionSet = z.infer<typeof AudioDeviceResolutionSetSchema>;
 export type AudioOutputSampleFormat = z.infer<typeof AudioOutputSampleFormatSchema>;
 export type AudioOutputChannelMode = z.infer<typeof AudioOutputChannelModeSchema>;
+export type AudioInputChannelMode = z.infer<typeof AudioInputChannelModeSchema>;
 export type AudioDevicesResponse = z.infer<typeof AudioDevicesResponseSchema>;
 export type AudioDeviceSettings = z.infer<typeof AudioDeviceSettingsSchema>;
 export type AudioDeviceSettingsResponse = z.infer<typeof AudioDeviceSettingsResponseSchema>;

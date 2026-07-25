@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, Tray, Menu, dialog, nativeTheme, powerSaveBlocker, session, globalShortcut, type WebContents } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, Tray, Menu, dialog, nativeTheme, powerSaveBlocker, session, globalShortcut, systemPreferences, type WebContents } from 'electron';
 import log from 'electron-log/main';
 import { homedir, hostname as getHostname, networkInterfaces } from 'node:os';
 import net from 'node:net';
@@ -1575,6 +1575,55 @@ function nodePath() {
   const res = resourcesRoot();
   const exe = process.platform === 'win32' ? 'node.exe' : 'node';
   return path.join(res, 'bin', triplet(), exe);
+}
+
+/**
+ * Request macOS microphone access before spawning the portable Node server.
+ * CoreAudio returns exact silence (not an error) when TCC denies audio input.
+ * The server child uses resources/bin/.../node, so users may also need to allow
+ * "node" / TX-5DR in System Settings → Privacy & Security → Microphone.
+ */
+async function ensureMacMicrophoneAccess(): Promise<void> {
+  if (process.platform !== 'darwin') {
+    return;
+  }
+
+  try {
+    const status = systemPreferences.getMediaAccessStatus('microphone');
+    logger.info('macOS microphone access status', { status });
+    if (status === 'granted') {
+      return;
+    }
+
+    const granted = await systemPreferences.askForMediaAccess('microphone');
+    logger.info('macOS microphone access request result', {
+      previousStatus: status,
+      granted,
+    });
+
+    if (!granted) {
+      const locale = app.getLocale();
+      const isZh = locale.toLowerCase().startsWith('zh');
+      const result = await dialog.showMessageBox({
+        type: 'warning',
+        buttons: isZh
+          ? ['打开系统设置', '继续']
+          : ['Open System Settings', 'Continue'],
+        defaultId: 0,
+        cancelId: 1,
+        title: 'TX-5DR',
+        message: isZh ? '需要麦克风权限才能采集电台音频' : 'Microphone access is required for radio audio capture',
+        detail: isZh
+          ? '请在“系统设置 → 隐私与安全性 → 麦克风”中允许 TX-5DR（以及列表中的 node，如有）。未授权时解码会收到静音，瀑布图仍可能显示电台 SDR 频谱。'
+          : 'Allow TX-5DR (and “node” if listed) under System Settings → Privacy & Security → Microphone. Without it, FT8 decode receives silence while radio-sdr waterfall may still show signals.',
+      });
+      if (result.response === 0) {
+        await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone');
+      }
+    }
+  } catch (error) {
+    logger.warn('failed to request macOS microphone access', error);
+  }
 }
 
 async function ensureWindowsVCRuntimeInstalled(): Promise<boolean> {
@@ -3445,6 +3494,8 @@ const startApp = async () => {
 
   const vcRuntimeOk = await ensureWindowsVCRuntimeInstalled();
   if (!vcRuntimeOk) return;
+
+  await ensureMacMicrophoneAccess();
 
   logger.info('calling createWindow');
   await createWindow();

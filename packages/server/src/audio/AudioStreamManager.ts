@@ -184,6 +184,7 @@ export interface PlayAudioOptions {
 export type PlaybackKind = 'digital' | 'voice-keyer' | 'tune-tone';
 type OutputSampleFormat = 'float32' | 'int16';
 type OutputChannelMode = 'mono' | 'left' | 'right' | 'both';
+type InputChannelMode = 'left' | 'right' | 'mix';
 
 interface EncodedOutputChunk {
   buffer: Buffer;
@@ -223,8 +224,12 @@ export class AudioStreamManager extends EventEmitter<AudioStreamEvents> {
   private inputBufferSize: number;
   private outputBufferSize: number;
   private channels: number = 1;
+  /** Physical channels opened on the RtAudio input stream (1 or 2). */
+  private inputCaptureChannels: number = 1;
   private outputSampleFormat: OutputSampleFormat = 'float32';
   private outputChannelMode: OutputChannelMode = 'mono';
+  /** How to map stereo USB input to mono RX (default mix = JTDX Mono). */
+  private inputChannelMode: InputChannelMode = 'mix';
   private outputChannels: number = 1;
   private volumeGain: number = Math.pow(10, -10 / 20); // 默认 -10dB
   private volumeGainDb: number = -10; // 以dB为单位的增益值
@@ -284,6 +289,7 @@ export class AudioStreamManager extends EventEmitter<AudioStreamEvents> {
     this.outputSampleFormat = this.normalizeOutputSampleFormat(audioConfig.outputSampleFormat);
     this.outputChannelMode = this.normalizeOutputChannelMode(audioConfig.outputChannelMode);
     this.outputChannels = this.getOutputChannelCount(this.outputChannelMode);
+    this.inputChannelMode = this.normalizeInputChannelMode(audioConfig.inputChannelMode);
     this.currentSampleRate = this.outputSampleRate;
 
     // 创建音频缓冲区提供者，使用统一的内部处理采样率，保留 60 秒 RX/input 历史。
@@ -302,6 +308,7 @@ export class AudioStreamManager extends EventEmitter<AudioStreamEvents> {
       outputSampleFormat: this.outputSampleFormat,
       outputChannelMode: this.outputChannelMode,
       outputChannels: this.outputChannels,
+      inputChannelMode: this.inputChannelMode,
       internalSampleRate: this.inputProcessingSampleRate,
     });
   }
@@ -687,6 +694,7 @@ export class AudioStreamManager extends EventEmitter<AudioStreamEvents> {
     const oldOutputSampleFormat = this.outputSampleFormat;
     const oldOutputChannelMode = this.outputChannelMode;
     const oldOutputChannels = this.outputChannels;
+    const oldInputChannelMode = this.inputChannelMode;
 
     this.inputSampleRate = audioConfig.inputSampleRate ?? audioConfig.sampleRate ?? 48000;
     this.outputSampleRate = audioConfig.outputSampleRate ?? audioConfig.sampleRate ?? 48000;
@@ -695,6 +703,7 @@ export class AudioStreamManager extends EventEmitter<AudioStreamEvents> {
     this.outputSampleFormat = this.normalizeOutputSampleFormat(audioConfig.outputSampleFormat);
     this.outputChannelMode = this.normalizeOutputChannelMode(audioConfig.outputChannelMode);
     this.outputChannels = this.getOutputChannelCount(this.outputChannelMode);
+    this.inputChannelMode = this.normalizeInputChannelMode(audioConfig.inputChannelMode);
     this.currentSampleRate = this.outputSampleRate;
 
     logger.info('audio config reloaded (restart required)', {
@@ -705,6 +714,7 @@ export class AudioStreamManager extends EventEmitter<AudioStreamEvents> {
       outputSampleFormat: `${oldOutputSampleFormat} -> ${this.outputSampleFormat}`,
       outputChannelMode: `${oldOutputChannelMode} -> ${this.outputChannelMode}`,
       outputChannels: `${oldOutputChannels} -> ${this.outputChannels}`,
+      inputChannelMode: `${oldInputChannelMode} -> ${this.inputChannelMode}`,
     });
   }
 
@@ -714,6 +724,10 @@ export class AudioStreamManager extends EventEmitter<AudioStreamEvents> {
 
   private normalizeOutputChannelMode(value: unknown): OutputChannelMode {
     return value === 'left' || value === 'right' || value === 'both' ? value : 'mono';
+  }
+
+  private normalizeInputChannelMode(value: unknown): InputChannelMode {
+    return value === 'left' || value === 'right' || value === 'mix' ? value : 'mix';
   }
 
   private getOutputChannelCount(mode: OutputChannelMode): number {
@@ -786,9 +800,12 @@ export class AudioStreamManager extends EventEmitter<AudioStreamEvents> {
         const truncatedLength = Math.floor(buffer.length / 4) * 4;
         buffer = buffer.subarray(0, truncatedLength);
       }
-      
-      // 创建 Float32Array 视图
-      const samples = new Float32Array(buffer.buffer, buffer.byteOffset, buffer.length / 4);
+
+      // Copy out of the RtAudio callback buffer. The device may reuse the
+      // underlying memory as soon as the callback returns, while
+      // ingestInputSamples may still be awaiting async 48k→12k resample.
+      const view = new Float32Array(buffer.buffer, buffer.byteOffset, buffer.length / 4);
+      const samples = new Float32Array(view);
       
       // 检查是否有无效值（NaN 或 Infinity）
       let hasInvalidValues = false;
@@ -1140,9 +1157,44 @@ export class AudioStreamManager extends EventEmitter<AudioStreamEvents> {
       throw new Error('audio input instance not initialized');
     }
 
+    const devices = this.rtAudioInput.getDevices?.() ?? [];
+    const device = devices.find((item: { id?: number }) => item.id === inputDeviceId) as
+      | { inputChannels?: number; name?: string }
+      | undefined;
+    const maxInputChannels = Math.max(1, Number(device?.inputChannels) || 1);
+    const mode = this.inputChannelMode;
+
+    let nChannels = 1;
+    let firstChannel = 0;
+    if (maxInputChannels >= 2) {
+      if (mode === 'right') {
+        nChannels = 1;
+        firstChannel = 1;
+      } else if (mode === 'mix') {
+        nChannels = 2;
+        firstChannel = 0;
+      } else {
+        nChannels = 1;
+        firstChannel = 0;
+      }
+    }
+
+    this.inputCaptureChannels = nChannels;
+    // Downstream RX path (ring / decode / spectrum) is always mono after downmix.
+    this.channels = 1;
+
+    logger.info('opening audio input stream', {
+      deviceId: inputDeviceId,
+      deviceName: device?.name,
+      maxInputChannels,
+      inputChannelMode: mode,
+      nChannels,
+      firstChannel,
+    });
+
     this.rtAudioInput.openStream(
       null,
-      { deviceId: inputDeviceId, nChannels: this.channels, firstChannel: 0 },
+      { deviceId: inputDeviceId, nChannels, firstChannel },
       RTAUDIO_FLOAT32,
       this.inputSampleRate,
       this.inputBufferSize,
@@ -1155,7 +1207,9 @@ export class AudioStreamManager extends EventEmitter<AudioStreamEvents> {
             return;
           }
 
-          const samples = this.convertBufferToFloat32(pcm);
+          const interleaved = this.convertBufferToFloat32(pcm);
+          if (interleaved.length === 0) return;
+          const samples = this.toMonoInputSamples(interleaved, nChannels, mode);
           if (samples.length === 0) return;
           void this.ingestInputSamples(samples, this.inputSampleRate, 'audio-device');
         } catch (error) {
@@ -1165,6 +1219,42 @@ export class AudioStreamManager extends EventEmitter<AudioStreamEvents> {
       },
       null
     );
+  }
+
+  /**
+   * Convert captured interleaved float samples to mono according to inputChannelMode.
+   */
+  private toMonoInputSamples(
+    interleaved: Float32Array,
+    captureChannels: number,
+    mode: InputChannelMode,
+  ): Float32Array {
+    if (captureChannels <= 1) {
+      return interleaved;
+    }
+
+    const frames = Math.floor(interleaved.length / captureChannels);
+    const mono = new Float32Array(frames);
+    if (mode === 'left') {
+      for (let i = 0; i < frames; i++) {
+        mono[i] = interleaved[i * captureChannels] || 0;
+      }
+      return mono;
+    }
+    if (mode === 'right') {
+      for (let i = 0; i < frames; i++) {
+        mono[i] = interleaved[i * captureChannels + 1] || 0;
+      }
+      return mono;
+    }
+
+    // mix
+    for (let i = 0; i < frames; i++) {
+      const left = interleaved[i * captureChannels] || 0;
+      const right = interleaved[i * captureChannels + 1] || 0;
+      mono[i] = (left + right) * 0.5;
+    }
+    return mono;
   }
 
   private async ingestInputSamples(

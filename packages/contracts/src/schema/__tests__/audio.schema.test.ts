@@ -5,6 +5,7 @@ import {
   AudioDeviceResolutionStatusSchema,
   AudioDeviceSettingsSchema,
   AudioDeviceSettingsResponseSchema,
+  AudioInputChannelModeSchema,
   AudioOutputChannelModeSchema,
   AudioOutputSampleFormatSchema,
   AudioSettingsResolveRequestSchema,
@@ -132,9 +133,11 @@ describe('audio device resolution schemas', () => {
     expect(AudioDeviceSettingsSchema.parse({
       outputSampleFormat: 'int16',
       outputChannelMode: 'right',
+      inputChannelMode: 'mix',
     })).toMatchObject({
       outputSampleFormat: 'int16',
       outputChannelMode: 'right',
+      inputChannelMode: 'mix',
     });
 
     expect(() => AudioDeviceSettingsSchema.parse({ outputSampleFormat: 'int24' })).toThrow();
