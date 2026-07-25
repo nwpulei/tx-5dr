@@ -73,4 +73,37 @@ describe('native module check result handling', () => {
     expect(result.success).toBe(false);
     expect(isDegradableNativeModuleCheckFailure(result)).toBe(true);
   });
+
+  it('allows missing darwin/x64 onnxruntime binding to remain degradable', () => {
+    const result = buildNativeModuleCheckExitResult({
+      code: 0,
+      signal: null,
+      lastChecking: null,
+      modules: [
+        { name: 'audify', ok: true },
+        {
+          name: 'onnxruntime-node',
+          ok: false,
+          error: "Cannot find module '../bin/napi-v6/darwin/x64/onnxruntime_binding.node'",
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    expect(isDegradableNativeModuleCheckFailure(result)).toBe(true);
+  });
+
+  it('keeps generic onnxruntime failures blocking', () => {
+    const result = buildNativeModuleCheckExitResult({
+      code: 0,
+      signal: null,
+      lastChecking: null,
+      modules: [
+        { name: 'onnxruntime-node', ok: false, error: 'VCRUNTIME140.dll was not found' },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    expect(isDegradableNativeModuleCheckFailure(result)).toBe(false);
+  });
 });

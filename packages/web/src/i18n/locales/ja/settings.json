@@ -383,6 +383,14 @@
       "both": "両方"
     },
     "outputChannelModeHint": "音声を Mono、左、右、または両方のチャンネルへ出力します",
+    "inputChannelMode": "入力チャンネル",
+    "selectInputChannelMode": "入力チャンネルを選択",
+    "inputChannelModeOptions": {
+      "left": "左",
+      "right": "右",
+      "mix": "ミックス（Mono）"
+    },
+    "inputChannelModeHint": "ステレオ USB コーデックではミックスを推奨。電波が右のみの場合は右を選択",
     "sampleRateFromDevice": "現在のサウンドカードに適しています",
     "sampleRateFallback": "一般的に使用されるサンプリング レート (手動で選択可能)",
     "sampleRateUnsupported": "現在の値はこのサウンドカードに適していない可能性があります",

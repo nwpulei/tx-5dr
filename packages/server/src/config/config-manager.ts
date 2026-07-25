@@ -222,6 +222,7 @@ const DEFAULT_AUDIO: AudioDeviceSettings = {
   outputBufferSize: 1024,
   outputSampleFormat: 'float32',
   outputChannelMode: 'mono',
+  inputChannelMode: 'mix',
 };
 
 export function normalizeAudioDeviceSettings(audioConfig?: Partial<AudioDeviceSettings> | null): AudioDeviceSettings {
@@ -243,6 +244,9 @@ export function normalizeAudioDeviceSettings(audioConfig?: Partial<AudioDeviceSe
     outputBufferSize: audioConfig?.outputBufferSize ?? legacyBufferSize ?? 1024,
     outputSampleFormat: audioConfig?.outputSampleFormat ?? 'float32',
     outputChannelMode: audioConfig?.outputChannelMode ?? 'mono',
+    inputChannelMode: audioConfig?.inputChannelMode === 'left' || audioConfig?.inputChannelMode === 'right'
+      ? audioConfig.inputChannelMode
+      : 'mix',
   };
 }
 

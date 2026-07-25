@@ -317,11 +317,20 @@ if [[ -d "$ONNX_NAPI_DIR" ]]; then
     case "$ARCH" in
         amd64)
             rm -rf "$ONNX_NAPI_DIR/linux/arm64" 2>/dev/null || true
+            ONNX_KEEP_ARCH="x64"
             ;;
         arm64)
             rm -rf "$ONNX_NAPI_DIR/linux/x64" 2>/dev/null || true
+            ONNX_KEEP_ARCH="arm64"
+            ;;
+        *)
+            ONNX_KEEP_ARCH=""
             ;;
     esac
+    if [[ -n "$ONNX_KEEP_ARCH" && ! -f "$ONNX_NAPI_DIR/linux/$ONNX_KEEP_ARCH/onnxruntime_binding.node" ]]; then
+        echo "ERROR: onnxruntime-node is missing linux/$ONNX_KEEP_ARCH binding" >&2
+        exit 1
+    fi
 fi
 # --- Copy web static files ---
 mkdir -p "$APP_ROOT/web"

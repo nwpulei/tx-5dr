@@ -172,6 +172,24 @@ function cleanNativeSources(nm) {
   findAndRemoveDirs(nm, '.npm');
 }
 
+/**
+ * Upstream onnxruntime-node >= 1.24 omitted macOS Intel (darwin/x64) prebuilds.
+ * That target is intentionally allowed to package without a binding (DeepCW
+ * degrades at runtime). Other platform/arch combinations must still ship one.
+ */
+function assertOnnxRuntimeBindingPresent(nm, platform, arch) {
+  const binding = path.join(nm, 'onnxruntime-node', 'bin', 'napi-v6', platform, arch, 'onnxruntime_binding.node');
+  if (fs.existsSync(binding)) return;
+  if (platform === 'darwin' && arch === 'x64') {
+    console.warn(
+      `onnxruntime-node has no darwin/x64 binding (upstream omission since 1.24). `
+      + 'Packaging continues; DeepCW will be unavailable on Intel Macs.',
+    );
+    return;
+  }
+  throw new Error(`onnxruntime-node is missing ${platform}/${arch} binding at ${binding}.`);
+}
+
 function cleanPackages(appRoot) {
   console.log('Cleaning workspace package sources...');
   findAndRemoveDirs(path.join(appRoot, 'packages'), 'node_modules');
@@ -223,6 +241,7 @@ function cleanPlatformPrebuilds(nm, platform, arch) {
     if (fs.existsSync(linuxOnnx)) {
       for (const entry of fs.readdirSync(linuxOnnx)) if (entry !== onnxKeepArch) rmrf(path.join(linuxOnnx, entry));
     }
+    assertOnnxRuntimeBindingPresent(nm, 'linux', onnxKeepArch);
   }
 
   if (platform === 'darwin') {
@@ -243,6 +262,7 @@ function cleanPlatformPrebuilds(nm, platform, arch) {
     if (fs.existsSync(darwinOnnx)) {
       for (const entry of fs.readdirSync(darwinOnnx)) if (entry !== onnxKeepArch) rmrf(path.join(darwinOnnx, entry));
     }
+    assertOnnxRuntimeBindingPresent(nm, 'darwin', onnxKeepArch);
   }
 
   if (platform === 'win32') {
@@ -260,6 +280,7 @@ function cleanPlatformPrebuilds(nm, platform, arch) {
     if (fs.existsSync(winOnnx)) {
       for (const entry of fs.readdirSync(winOnnx)) if (entry !== onnxKeepArch) rmrf(path.join(winOnnx, entry));
     }
+    assertOnnxRuntimeBindingPresent(nm, 'win32', onnxKeepArch);
   }
 }
 

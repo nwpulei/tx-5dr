@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { NATIVE_MODULES, runNativeModulePreflight } from '../check-native-modules.js';
+import {
+  NATIVE_MODULES,
+  isDegradableNativeModuleFailure,
+  isMissingDarwinX64OnnxBindingError,
+  runNativeModulePreflight,
+} from '../check-native-modules.js';
 
 describe('native module preflight list', () => {
   it('includes onnxruntime-node so Windows VC runtime issues surface at startup', () => {
@@ -51,5 +56,41 @@ describe('native module preflight list', () => {
     expect(ok).toBe(true);
     expect(lines).toContain('FAIL:node-datachannel:optional realtime transport failed');
     expect(lines).toContain('DONE');
+  });
+
+  it('treats missing darwin/x64 onnxruntime binding as degradable', async () => {
+    const missingBindingError = "Cannot find module '../bin/napi-v6/darwin/x64/onnxruntime_binding.node'";
+    expect(isMissingDarwinX64OnnxBindingError(missingBindingError)).toBe(true);
+    expect(isDegradableNativeModuleFailure('onnxruntime-node', missingBindingError)).toBe(true);
+    expect(isDegradableNativeModuleFailure('onnxruntime-node', 'The specified module could not be found.')).toBe(false);
+
+    const lines: string[] = [];
+    const ok = await runNativeModulePreflight({
+      importer: async (moduleName) => {
+        if (moduleName === 'onnxruntime-node') {
+          throw new Error(missingBindingError);
+        }
+        return {};
+      },
+      writeLine: (line) => lines.push(line),
+    });
+
+    expect(ok).toBe(true);
+    expect(lines.some((line) => line.startsWith('FAIL:onnxruntime-node:'))).toBe(true);
+  });
+
+  it('keeps non-darwin onnxruntime failures blocking', async () => {
+    const lines: string[] = [];
+    const ok = await runNativeModulePreflight({
+      importer: async (moduleName) => {
+        if (moduleName === 'onnxruntime-node') {
+          throw new Error('VCRUNTIME140.dll was not found');
+        }
+        return {};
+      },
+      writeLine: (line) => lines.push(line),
+    });
+
+    expect(ok).toBe(false);
   });
 });

@@ -82,6 +82,12 @@ export interface ElectronMessages {
     title: string;
     detail: string;
   };
+  microphoneAccess: {
+    title: string;
+    message: string;
+    detail: string;
+    buttons: [string, string];
+  };
   menu: {
     openMainWindow: string;
     openDevTools: string;
@@ -171,6 +177,12 @@ const ZH: ElectronMessages = {
     title: '浏览器可能提示证书不安全',
     detail: '当前浏览器入口使用自签名证书。首次访问时，浏览器可能会提示连接不安全；如果这是你自己的设备，请手动放行后继续访问。',
   },
+  microphoneAccess: {
+    title: 'TX-5DR',
+    message: '需要麦克风权限才能采集电台音频',
+    detail: '请在“系统设置 → 隐私与安全性 → 麦克风”中允许 TX-5DR（以及列表中的 node，如有）。未授权时解码会收到静音，瀑布图仍可能显示电台 SDR 频谱。',
+    buttons: ['打开系统设置', '继续'],
+  },
   menu: {
     openMainWindow: '打开主窗口',
     openDevTools: '打开开发者工具',
@@ -259,6 +271,12 @@ const EN: ElectronMessages = {
   httpsSelfSigned: {
     title: 'Your browser may warn about the certificate',
     detail: 'This browser entrypoint currently uses a self-signed certificate. The first visit may show a security warning; if this is your own device, continue manually after confirming it is expected.',
+  },
+  microphoneAccess: {
+    title: 'TX-5DR',
+    message: 'Microphone access is required for radio audio capture',
+    detail: 'Allow TX-5DR (and “node” if listed) under System Settings → Privacy & Security → Microphone. Without it, FT8 decode receives silence while radio-sdr waterfall may still show signals.',
+    buttons: ['Open System Settings', 'Continue'],
   },
   menu: {
     openMainWindow: 'Open Main Window',

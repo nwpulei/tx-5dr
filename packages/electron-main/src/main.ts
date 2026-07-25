@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, Tray, Menu, dialog, nativeTheme, powerSaveBlocker, session, globalShortcut, type WebContents } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, Tray, Menu, dialog, nativeTheme, powerSaveBlocker, session, globalShortcut, systemPreferences, type WebContents } from 'electron';
 import log from 'electron-log/main';
 import { homedir, hostname as getHostname, networkInterfaces } from 'node:os';
 import net from 'node:net';
@@ -1575,6 +1575,50 @@ function nodePath() {
   const res = resourcesRoot();
   const exe = process.platform === 'win32' ? 'node.exe' : 'node';
   return path.join(res, 'bin', triplet(), exe);
+}
+
+/**
+ * Request macOS microphone access before spawning the portable Node server.
+ * CoreAudio returns exact silence (not an error) when TCC denies audio input.
+ * The server child uses resources/bin/.../node, so users may also need to allow
+ * "node" / TX-5DR in System Settings → Privacy & Security → Microphone.
+ */
+async function ensureMacMicrophoneAccess(): Promise<void> {
+  if (process.platform !== 'darwin') {
+    return;
+  }
+
+  try {
+    const status = systemPreferences.getMediaAccessStatus('microphone');
+    logger.info('macOS microphone access status', { status });
+    if (status === 'granted') {
+      return;
+    }
+
+    const granted = await systemPreferences.askForMediaAccess('microphone');
+    logger.info('macOS microphone access request result', {
+      previousStatus: status,
+      granted,
+    });
+
+    if (!granted) {
+      const msgs = getMessages(app.getLocale()).microphoneAccess;
+      const result = await dialog.showMessageBox({
+        type: 'warning',
+        buttons: [...msgs.buttons],
+        defaultId: 0,
+        cancelId: 1,
+        title: msgs.title,
+        message: msgs.message,
+        detail: msgs.detail,
+      });
+      if (result.response === 0) {
+        await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone');
+      }
+    }
+  } catch (error) {
+    logger.warn('failed to request macOS microphone access', error);
+  }
 }
 
 async function ensureWindowsVCRuntimeInstalled(): Promise<boolean> {
@@ -3206,10 +3250,11 @@ async function createWindow() {
     if (!nativeCheck.success) {
       const okModules = nativeCheck.modules.filter(m => m.ok).map(m => m.name);
       const failedModules = nativeCheck.modules.filter(m => !m.ok);
-      const degradedRealtimeOnly = isDegradableNativeModuleCheckFailure(nativeCheck);
+      const degradedOnly = isDegradableNativeModuleCheckFailure(nativeCheck);
 
-      if (degradedRealtimeOnly) {
-        logger.warn('degradable realtime native check failed; continuing with PCM/ws fallback available', nativeCheck);
+      if (degradedOnly) {
+        const degradedNames = failedModules.map((moduleResult) => moduleResult.name).join(', ');
+        logger.warn(`degradable native module check failed (${degradedNames}); continuing startup`, nativeCheck);
       } else {
         let detail: string;
         if (nativeCheck.crashedModule) {
@@ -3444,6 +3489,8 @@ const startApp = async () => {
 
   const vcRuntimeOk = await ensureWindowsVCRuntimeInstalled();
   if (!vcRuntimeOk) return;
+
+  await ensureMacMicrophoneAccess();
 
   logger.info('calling createWindow');
   await createWindow();

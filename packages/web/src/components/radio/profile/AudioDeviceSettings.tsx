@@ -15,6 +15,7 @@ import type {
   AudioDevice,
   AudioDeviceResolution,
   AudioDeviceSettings as AudioDeviceSettingsType,
+  AudioInputChannelMode,
   AudioOutputChannelMode,
   AudioOutputSampleFormat,
   HamlibConfig,
@@ -61,8 +62,10 @@ const DEFAULT_SAMPLE_RATE = 48000;
 const DEFAULT_BUFFER_SIZE = 1024;
 const DEFAULT_OUTPUT_SAMPLE_FORMAT: AudioOutputSampleFormat = 'float32';
 const DEFAULT_OUTPUT_CHANNEL_MODE: AudioOutputChannelMode = 'mono';
+const DEFAULT_INPUT_CHANNEL_MODE: AudioInputChannelMode = 'mix';
 const OUTPUT_SAMPLE_FORMAT_OPTIONS: AudioOutputSampleFormat[] = ['float32', 'int16'];
 const OUTPUT_CHANNEL_MODE_OPTIONS: AudioOutputChannelMode[] = ['mono', 'left', 'right', 'both'];
+const INPUT_CHANNEL_MODE_OPTIONS: AudioInputChannelMode[] = ['left', 'right', 'mix'];
 
 export function makeAudioDeviceSelectKey(direction: Direction, identity: string): string {
   return `${direction}::${identity}`;
@@ -171,6 +174,7 @@ export const AudioDeviceSettings = forwardRef<AudioDeviceSettingsRef, AudioDevic
   const [outputBufferSize, setOutputBufferSize] = useState<number>(resolveAudioSettingNumber(initialConfig, 'outputBufferSize', 'bufferSize', DEFAULT_BUFFER_SIZE));
   const [outputSampleFormat, setOutputSampleFormat] = useState<AudioOutputSampleFormat>(resolveOutputSampleFormat(initialConfig));
   const [outputChannelMode, setOutputChannelMode] = useState<AudioOutputChannelMode>(resolveOutputChannelMode(initialConfig));
+  const [inputChannelMode, setInputChannelMode] = useState<AudioInputChannelMode>(resolveInputChannelMode(initialConfig));
   const [deviceResolution, setDeviceResolution] = useState<{
     input: AudioDeviceResolution;
     output: AudioDeviceResolution;
@@ -208,6 +212,7 @@ export const AudioDeviceSettings = forwardRef<AudioDeviceSettingsRef, AudioDevic
     setOutputBufferSize(resolveAudioSettingNumber(initialConfig, 'outputBufferSize', 'bufferSize', DEFAULT_BUFFER_SIZE));
     setOutputSampleFormat(resolveOutputSampleFormat(initialConfig));
     setOutputChannelMode(resolveOutputChannelMode(initialConfig));
+    setInputChannelMode(resolveInputChannelMode(initialConfig));
     return () => { syncingFromParentRef.current = false; };
   }, [initialConfig, loading, isControlled]);
 
@@ -226,6 +231,7 @@ export const AudioDeviceSettings = forwardRef<AudioDeviceSettingsRef, AudioDevic
     outputBufferSize,
     outputSampleFormat,
     outputChannelMode,
+    inputChannelMode,
   });
 
   const hasUnsavedChanges = () => {
@@ -243,7 +249,8 @@ export const AudioDeviceSettings = forwardRef<AudioDeviceSettingsRef, AudioDevic
       inputBufferSize !== resolveAudioSettingNumber(currentSettings, 'inputBufferSize', 'bufferSize', DEFAULT_BUFFER_SIZE) ||
       outputBufferSize !== resolveAudioSettingNumber(currentSettings, 'outputBufferSize', 'bufferSize', DEFAULT_BUFFER_SIZE) ||
       outputSampleFormat !== resolveOutputSampleFormat(currentSettings) ||
-      outputChannelMode !== resolveOutputChannelMode(currentSettings)
+      outputChannelMode !== resolveOutputChannelMode(currentSettings) ||
+      inputChannelMode !== resolveInputChannelMode(currentSettings)
     );
   };
 
@@ -251,11 +258,11 @@ export const AudioDeviceSettings = forwardRef<AudioDeviceSettingsRef, AudioDevic
     hasUnsavedChanges,
     getSettings: buildSettings,
     save: handleSubmit
-  }), [selectedInputDeviceName, selectedOutputDeviceName, selectedInputRouteKey, selectedOutputRouteKey, selectedInputDeviceId, selectedOutputDeviceId, selectedInputHardwareId, selectedOutputHardwareId, inputDevices, outputDevices, inputSampleRate, outputSampleRate, inputBufferSize, outputBufferSize, outputSampleFormat, outputChannelMode, currentSettings]);
+  }), [selectedInputDeviceName, selectedOutputDeviceName, selectedInputRouteKey, selectedOutputRouteKey, selectedInputDeviceId, selectedOutputDeviceId, selectedInputHardwareId, selectedOutputHardwareId, inputDevices, outputDevices, inputSampleRate, outputSampleRate, inputBufferSize, outputBufferSize, outputSampleFormat, outputChannelMode, inputChannelMode, currentSettings]);
 
   useEffect(() => {
     onUnsavedChanges?.(hasUnsavedChanges());
-  }, [selectedInputDeviceName, selectedOutputDeviceName, selectedInputRouteKey, selectedOutputRouteKey, selectedInputDeviceId, selectedOutputDeviceId, selectedInputHardwareId, selectedOutputHardwareId, inputDevices, outputDevices, inputSampleRate, outputSampleRate, inputBufferSize, outputBufferSize, outputSampleFormat, outputChannelMode, currentSettings, onUnsavedChanges]);
+  }, [selectedInputDeviceName, selectedOutputDeviceName, selectedInputRouteKey, selectedOutputRouteKey, selectedInputDeviceId, selectedOutputDeviceId, selectedInputHardwareId, selectedOutputHardwareId, inputDevices, outputDevices, inputSampleRate, outputSampleRate, inputBufferSize, outputBufferSize, outputSampleFormat, outputChannelMode, inputChannelMode, currentSettings, onUnsavedChanges]);
 
   useEffect(() => {
     if (!isControlled || loading) return;
@@ -270,7 +277,7 @@ export const AudioDeviceSettings = forwardRef<AudioDeviceSettingsRef, AudioDevic
       return;
     }
     onChange?.(settings);
-  }, [selectedInputDeviceName, selectedOutputDeviceName, selectedInputRouteKey, selectedOutputRouteKey, selectedInputDeviceId, selectedOutputDeviceId, selectedInputHardwareId, selectedOutputHardwareId, inputDevices, outputDevices, inputSampleRate, outputSampleRate, inputBufferSize, outputBufferSize, outputSampleFormat, outputChannelMode, initialConfig]);
+  }, [selectedInputDeviceName, selectedOutputDeviceName, selectedInputRouteKey, selectedOutputRouteKey, selectedInputDeviceId, selectedOutputDeviceId, selectedInputHardwareId, selectedOutputHardwareId, inputDevices, outputDevices, inputSampleRate, outputSampleRate, inputBufferSize, outputBufferSize, outputSampleFormat, outputChannelMode, inputChannelMode, initialConfig]);
 
   useEffect(() => {
     loadAudioData();
@@ -293,7 +300,7 @@ export const AudioDeviceSettings = forwardRef<AudioDeviceSettingsRef, AudioDevic
     return () => {
       active = false;
     };
-  }, [selectedInputDeviceName, selectedOutputDeviceName, selectedInputRouteKey, selectedOutputRouteKey, selectedInputDeviceId, selectedOutputDeviceId, selectedInputHardwareId, selectedOutputHardwareId, inputSampleRate, outputSampleRate, inputBufferSize, outputBufferSize, outputSampleFormat, outputChannelMode, radioType, loading]);
+  }, [selectedInputDeviceName, selectedOutputDeviceName, selectedInputRouteKey, selectedOutputRouteKey, selectedInputDeviceId, selectedOutputDeviceId, selectedInputHardwareId, selectedOutputHardwareId, inputSampleRate, outputSampleRate, inputBufferSize, outputBufferSize, outputSampleFormat, outputChannelMode, inputChannelMode, radioType, loading]);
 
   const inputEffectiveDevice = getEffectiveDevice('input');
   const outputEffectiveDevice = getEffectiveDevice('output');
@@ -672,6 +679,28 @@ export const AudioDeviceSettings = forwardRef<AudioDeviceSettingsRef, AudioDevic
           </div>
         </div>
 
+        {isInput && !isVirtual && (
+          <div className="space-y-1">
+            <Select
+              label={t('audio.inputChannelMode')}
+              selectedKeys={[inputChannelMode]}
+              onSelectionChange={(keys) => {
+                const selected = Array.from(keys)[0] as AudioInputChannelMode | undefined;
+                setInputChannelMode(resolveInputChannelMode({ inputChannelMode: selected }));
+              }}
+              isDisabled={saving}
+              aria-label={t('audio.selectInputChannelMode')}
+            >
+              {INPUT_CHANNEL_MODE_OPTIONS.map((value) => (
+                <SelectItem key={value} textValue={t(`audio.inputChannelModeOptions.${value}`)}>
+                  {t(`audio.inputChannelModeOptions.${value}`)}
+                </SelectItem>
+              )) as unknown as React.ReactElement}
+            </Select>
+            <p className="text-xs text-default-400">{t('audio.inputChannelModeHint')}</p>
+          </div>
+        )}
+
         {!isInput && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -840,7 +869,8 @@ export function audioSettingsEqual(
     && a.inputBufferSize === resolveAudioSettingNumber(b, 'inputBufferSize', 'bufferSize', DEFAULT_BUFFER_SIZE)
     && a.outputBufferSize === resolveAudioSettingNumber(b, 'outputBufferSize', 'bufferSize', DEFAULT_BUFFER_SIZE)
     && resolveOutputSampleFormat(a) === resolveOutputSampleFormat(b)
-    && resolveOutputChannelMode(a) === resolveOutputChannelMode(b);
+    && resolveOutputChannelMode(a) === resolveOutputChannelMode(b)
+    && resolveInputChannelMode(a) === resolveInputChannelMode(b);
 }
 
 function getStatusBadgeClassName(tone: 'default' | 'primary' | 'success' | 'warning' | 'danger'): string {
@@ -863,6 +893,13 @@ export function resolveOutputChannelMode(settings: AudioDeviceSettingsType | und
   return value === 'left' || value === 'right' || value === 'both'
     ? value
     : DEFAULT_OUTPUT_CHANNEL_MODE;
+}
+
+export function resolveInputChannelMode(settings: AudioDeviceSettingsType | undefined): AudioInputChannelMode {
+  const value = settings?.inputChannelMode;
+  return value === 'left' || value === 'right' || value === 'mix'
+    ? value
+    : DEFAULT_INPUT_CHANNEL_MODE;
 }
 
 function formatHertz(value: number): string {

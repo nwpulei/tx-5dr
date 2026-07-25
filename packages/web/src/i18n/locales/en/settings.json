@@ -385,6 +385,14 @@
       "both": "Both"
     },
     "outputChannelModeHint": "Choose whether audio is sent as mono, left, right, or both channels",
+    "inputChannelMode": "Input Channel",
+    "selectInputChannelMode": "Select input channel",
+    "inputChannelModeOptions": {
+      "left": "Left",
+      "right": "Right",
+      "mix": "Mix (Mono)"
+    },
+    "inputChannelModeHint": "Use Mix for stereo USB codecs; choose Right if radio AF is on the right channel only",
     "sampleRateFromDevice": "Good for this sound card",
     "sampleRateFallback": "Common rates; choose manually",
     "sampleRateUnsupported": "This rate may not suit this sound card",

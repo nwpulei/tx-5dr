@@ -32,6 +32,25 @@ export interface NativeModuleCheckResult {
 
 export const DEGRADABLE_NATIVE_MODULES = new Set(['node-datachannel']);
 
+/**
+ * Upstream onnxruntime-node stopped shipping macOS Intel (darwin/x64) prebuilds
+ * after 1.23.x. Keep that specific missing-binding failure degradable so startup
+ * is not blocked on Intel Macs when the binding is absent. DeepCW is unavailable
+ * there; we do not downgrade onnxruntime-node to restore it.
+ */
+export function isMissingDarwinX64OnnxBindingError(message: string): boolean {
+  return /darwin[/\\]x64[/\\]onnxruntime_binding\.node/.test(message);
+}
+
+export function isDegradableNativeModuleFailure(moduleName: string, errorMessage?: string): boolean {
+  if (DEGRADABLE_NATIVE_MODULES.has(moduleName)) {
+    return true;
+  }
+  return moduleName === 'onnxruntime-node'
+    && typeof errorMessage === 'string'
+    && isMissingDarwinX64OnnxBindingError(errorMessage);
+}
+
 function joinPathList(entries: Array<string | undefined>, separator: string): string {
   return entries.filter((entry): entry is string => Boolean(entry)).join(separator);
 }
@@ -106,10 +125,11 @@ export function isDegradableNativeModuleCheckFailure(result: NativeModuleCheckRe
 
   const failedModules = result.modules.filter((moduleResult) => !moduleResult.ok);
   if (result.crashedModule) {
-    return DEGRADABLE_NATIVE_MODULES.has(result.crashedModule);
+    const crashed = failedModules.find((moduleResult) => moduleResult.name === result.crashedModule);
+    return isDegradableNativeModuleFailure(result.crashedModule, crashed?.error);
   }
 
   return failedModules.length > 0 && failedModules.every((moduleResult) => (
-    DEGRADABLE_NATIVE_MODULES.has(moduleResult.name)
+    isDegradableNativeModuleFailure(moduleResult.name, moduleResult.error)
   ));
 }

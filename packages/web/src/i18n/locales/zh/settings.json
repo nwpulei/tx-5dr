@@ -385,6 +385,14 @@
       "both": "双声道"
     },
     "outputChannelModeHint": "选择音频输出到单声道、左声道、右声道或双声道",
+    "inputChannelMode": "输入声道",
+    "selectInputChannelMode": "选择输入声道",
+    "inputChannelModeOptions": {
+      "left": "左声道",
+      "right": "右声道",
+      "mix": "混合（Mono）"
+    },
+    "inputChannelModeHint": "立体声 USB 声卡常用混合；若电台只接右声道可选右声道",
     "sampleRateFromDevice": "适合当前声卡",
     "sampleRateFallback": "常用采样率，可手动选择",
     "sampleRateUnsupported": "当前值可能不适合这块声卡",
